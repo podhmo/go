@@ -286,7 +286,8 @@ func makemap64(t *maptype, hint int64, h *hmap) *hmap {
 // at compile time and the map needs to be allocated on the heap.
 func makemap_small() *hmap {
 	h := new(hmap)
-	h.hash0 = fastrand()
+	h.hash0 = uint32(0)
+	// h.hash0 = fastrand()
 	return h
 }
 
@@ -311,7 +312,8 @@ func makemap(t *maptype, hint int, h *hmap) *hmap {
 	if h == nil {
 		h = (*hmap)(newobject(t.hmap))
 	}
-	h.hash0 = fastrand()
+	// h.hash0 = fastrand()
+	h.hash0 = uint32(0)
 
 	// find size parameter which will hold the requested # of elements
 	B := uint8(0)
@@ -718,10 +720,13 @@ func mapiterinit(t *maptype, h *hmap, it *hiter) {
 	}
 
 	// decide where to start
-	r := uintptr(fastrand())
+	// r := uintptr(fastrand())
+	r := uintptr(0)
 	if h.B > 31-bucketCntBits {
-		r += uintptr(fastrand()) << 31
+		// r += uintptr(fastrand()) << 31
+		r += uintptr(uint32(0)) << 31
 	}
+
 	it.startBucket = r & bucketMask(h.B)
 	it.offset = uint8(r >> h.B & (bucketCnt - 1))
 
