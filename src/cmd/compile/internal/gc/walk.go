@@ -1477,20 +1477,22 @@ opswitch:
 			// For hint <= BUCKETSIZE overLoadFactor(hint, 0) is false
 			// and no buckets will be allocated by makemap. Therefore,
 			// no buckets need to be allocated in this code path.
-			if n.Esc == EscNone {
-				// Only need to initialize h.hash0 since
-				// hmap h has been allocated on the stack already.
-				// h.hash0 = fastrand()
-				rand := mkcall("fastrand", types.Types[TUINT32], init)
-				hashsym := hmapType.Field(4).Sym // hmap.hash0 see reflect.go:hmap
-				a := nod(OAS, nodSym(ODOT, h, hashsym), rand)
-				a = typecheck(a, Etop)
-				a = walkexpr(a, init)
-				init.Append(a)
-				n = nod(OCONVNOP, h, nil)
-				n.Type = t
-				n = typecheck(n, Erv)
-			} else {
+
+			// if n.Esc == EscNone {
+			// 	// Only need to initialize h.hash0 since
+			// 	// hmap h has been allocated on the stack already.
+			// 	// h.hash0 = fastrand()
+			// 	rand := mkcall("fastrand", types.Types[TUINT32], init)
+			// 	hashsym := hmapType.Field(4).Sym // hmap.hash0 see reflect.go:hmap
+			// 	a := nod(OAS, nodSym(ODOT, h, hashsym), rand)
+			// 	a = typecheck(a, Etop)
+			// 	a = walkexpr(a, init)
+			// 	init.Append(a)
+			// 	n = nod(OCONVNOP, h, nil)
+			// 	n.Type = t
+			// 	n = typecheck(n, Erv)
+			// } else 
+            {
 				// Call runtime.makehmap to allocate an
 				// hmap on the heap and initialize hmap's hash0 field.
 				fn := syslook("makemap_small")

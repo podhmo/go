@@ -226,15 +226,15 @@ func (h *hmap) incrnoverflow() {
 		h.noverflow++
 		return
 	}
-	// Increment with probability 1/(1<<(h.B-15)).
-	// When we reach 1<<15 - 1, we will have approximately
-	// as many overflow buckets as buckets.
-	mask := uint32(1)<<(h.B-15) - 1
-	// Example: if h.B == 18, then mask == 7,
-	// and fastrand & 7 == 0 with probability 1/8.
-	if fastrand()&mask == 0 {
-		h.noverflow++
-	}
+	// // Increment with probability 1/(1<<(h.B-15)).
+	// // When we reach 1<<15 - 1, we will have approximately
+	// // as many overflow buckets as buckets.
+	// mask := uint32(1)<<(h.B-15) - 1
+	// // Example: if h.B == 18, then mask == 7,
+	// // and fastrand & 7 == 0 with probability 1/8.
+	// if fastrand()&mask == 0 {
+	// 	h.noverflow++
+	// }
 }
 
 func (h *hmap) newoverflow(t *maptype, b *bmap) *bmap {
@@ -722,10 +722,12 @@ func mapiterinit(t *maptype, h *hmap, it *hiter) {
 	// decide where to start
 	// r := uintptr(fastrand())
 	r := uintptr(0)
-	if h.B > 31-bucketCntBits {
-		// r += uintptr(fastrand()) << 31
-		r += uintptr(uint32(0)) << 31
-	}
+	// if h.B > 31-bucketCntBits {
+	// 	r += uintptr(fastrand()) << 31
+	// 	r += uintptr(uint32(0)) << 31
+	// }
+	// println("@@ hash0", h.hash0)
+	// println("@@ r", r)
 
 	it.startBucket = r & bucketMask(h.B)
 	it.offset = uint8(r >> h.B & (bucketCnt - 1))
@@ -757,7 +759,6 @@ func mapiternext(it *hiter) {
 	i := it.i
 	checkBucket := it.checkBucket
 	alg := t.key.alg
-
 next:
 	if b == nil {
 		if bucket == it.startBucket && it.wrapped {
