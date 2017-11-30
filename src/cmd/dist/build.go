@@ -1117,8 +1117,8 @@ func cmdbootstrap() {
 	flag.BoolVar(&noBanner, "no-banner", noBanner, "do not print banner")
 
 	xflagparse(0)
-
 	if debug {
+        vflag = 2
 		// cmd/buildid is used in debug mode.
 		toolchain = append(toolchain, "cmd/buildid")
 	}
@@ -1158,7 +1158,9 @@ func cmdbootstrap() {
 
 	timelog("build", "go_bootstrap")
 	xprintf("Building Go bootstrap cmd/go (go_bootstrap) using Go toolchain1.\n")
+    xprintf("@@install runtime\n")
 	install("runtime") // dependency not visible in sources; also sets up textflag.h
+    xprintf("@@install cmd/go\n")
 	install("cmd/go")
 	if vflag > 0 {
 		xprintf("\n")

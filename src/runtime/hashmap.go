@@ -153,9 +153,10 @@ func hlinkRemove(h *hmap, k unsafe.Pointer) {
 				l.prev.next = l.next
 				l.next.prev = prev
 			}
-			break
+			return
 		}
 	}
+	// panic("not found")
 }
 
 // mapextra holds fields that are not present on all maps.
@@ -771,6 +772,14 @@ func mapiterinit(t *maptype, h *hmap, it *hiter) {
 		atomic.Or8(&h.flags, iterator|oldIterator)
 	}
 
+	//
+	// if h.start != nil {
+	// 	println("@@")
+	// 	for l := h.start.next; l.next != nil; l = l.next {
+	// 		k, v := mapaccessK(t, h, l.key)
+	// 		println("@@@", k, v)
+	// 	}
+	// }
 	mapiternext(it)
 }
 

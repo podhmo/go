@@ -55,6 +55,9 @@ func dumpobj() {
 }
 
 func dumpobj1(outfile string, mode int) {
+	fmt.Println("before dumpobj1", outfile, mode)
+	defer fmt.Println("after dumpobj1", outfile, mode)
+
 	bout, err := bio.Create(outfile)
 	if err != nil {
 		flusherrors()

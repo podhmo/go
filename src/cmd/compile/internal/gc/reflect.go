@@ -227,9 +227,12 @@ func bmap(t *types.Type) *types.Type {
 
 func hlink(t *types.Type) *types.Type {
 	hlink := types.New(TSTRUCT)
+	hlink.SetNoalg(true)
+	prev := types.NewPtr(hlink)
+	next := types.NewPtr(hlink)
 	fields := []*types.Field{
-		// makefield("prev", types.NewPtr(hlink)),
-		// makefield("next", types.NewPtr(hlink)),
+		makefield("prev", prev),
+		makefield("next", next),
 		makefield("key", types.Types[TUNSAFEPTR]),
 	}
 	hlink.SetFields(fields)
