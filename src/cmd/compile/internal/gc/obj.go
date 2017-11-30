@@ -94,10 +94,12 @@ func dumpobj1(outfile string, mode int) {
 	printheader()
 
 	if mode&modeCompilerObj != 0 {
+        fmt.Println("* dumpexport")
 		dumpexport(bout)
 	}
 
 	if writearchive {
+        fmt.Println("* writearchive1")
 		bout.Flush()
 		size := bout.Offset() - startobj
 		if size&1 != 0 {
@@ -115,6 +117,7 @@ func dumpobj1(outfile string, mode int) {
 	}
 
 	if writearchive {
+        fmt.Println("* writearchive2")
 		// start object file
 		arhdr = [ArhdrSize]byte{}
 		bout.Write(arhdr[:])
@@ -136,12 +139,19 @@ func dumpobj1(outfile string, mode int) {
 
 	externs := len(externdcl)
 
+    fmt.Println("* dumpglobals")
 	dumpglobls()
+    fmt.Println("* addptabs")
 	addptabs()
+    fmt.Println("* addsignats")
 	addsignats(externdcl)
+    fmt.Println("* dumpsignats") // this
 	dumpsignats()
+    fmt.Println("* dumptabs")
 	dumptabs()
+    fmt.Println("* dumpimportstrings")
 	dumpimportstrings()
+    fmt.Println("* dumpbasictypes")
 	dumpbasictypes()
 
 	// Dump extra globals.
@@ -150,19 +160,24 @@ func dumpobj1(outfile string, mode int) {
 	if externdcl != nil {
 		externdcl = externdcl[externs:]
 	}
+    fmt.Println("* dumpglobls2")
 	dumpglobls()
 	externdcl = tmp
 
 	if zerosize > 0 {
+        fmt.Println("* ggloblsym")
 		zero := mappkg.Lookup("zero")
 		ggloblsym(zero.Linksym(), int32(zerosize), obj.DUPOK|obj.RODATA)
 	}
 
+    fmt.Println("* addGCLocals")
 	addGCLocals()
 
+    fmt.Println("* WriteObjFile")
 	obj.WriteObjFile(Ctxt, bout.Writer)
 
 	if writearchive {
+        fmt.Println("* writearchive3")
 		bout.Flush()
 		size := bout.Offset() - startobj
 		if size&1 != 0 {
