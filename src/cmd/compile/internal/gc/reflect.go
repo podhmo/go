@@ -1164,6 +1164,7 @@ func formalType(t *types.Type) *types.Type {
 }
 
 func dtypesym(t *types.Type) *obj.LSym {
+	fmt.Println("**** dtypesym", "formattype", fmt.Sprintf("%#v", t))
 	t = formalType(t)
 	if t.IsUntyped() {
 		Fatalf("dtypesym %v", t)
@@ -1171,6 +1172,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 
 	s := typesym(t)
 	lsym := s.Linksym()
+	fmt.Println("**** dtypesym", "Siggen")
 	if s.Siggen() {
 		return lsym
 	}
@@ -1200,13 +1202,16 @@ func dtypesym(t *types.Type) *obj.LSym {
 		}
 	}
 
+	fmt.Println("**** dtypesym", "switch")
 	ot := 0
 	switch t.Etype {
 	default:
+		fmt.Println("****** dtypesym switch", "default")
 		ot = dcommontype(lsym, ot, t)
 		ot = dextratype(lsym, ot, t, 0)
 
 	case TARRAY:
+		fmt.Println("****** dtypesym switch", "TARRAY")
 		// ../../../../runtime/type.go:/arrayType
 		s1 := dtypesym(t.Elem())
 		t2 := types.NewSlice(t.Elem())
@@ -1218,6 +1223,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		ot = dextratype(lsym, ot, t, 0)
 
 	case TSLICE:
+		fmt.Println("****** dtypesym switch", "TSlice")
 		// ../../../../runtime/type.go:/sliceType
 		s1 := dtypesym(t.Elem())
 		ot = dcommontype(lsym, ot, t)
@@ -1225,6 +1231,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		ot = dextratype(lsym, ot, t, 0)
 
 	case TCHAN:
+		fmt.Println("****** dtypesym switch", "TChan")
 		// ../../../../runtime/type.go:/chanType
 		s1 := dtypesym(t.Elem())
 		ot = dcommontype(lsym, ot, t)
@@ -1233,6 +1240,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		ot = dextratype(lsym, ot, t, 0)
 
 	case TFUNC:
+		fmt.Println("****** dtypesym switch", "TFunc")
 		for _, t1 := range t.Recvs().Fields().Slice() {
 			dtypesym(t1.Type)
 		}
@@ -1272,6 +1280,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		}
 
 	case TINTER:
+		fmt.Println("****** dtypesym switch", "TInter")
 		m := imethods(t)
 		n := len(m)
 		for _, a := range m {
@@ -1308,10 +1317,13 @@ func dtypesym(t *types.Type) *obj.LSym {
 
 	// ../../../../runtime/type.go:/mapType
 	case TMAP:
+		fmt.Println("****** dtypesym switch", "TMap")
 		s1 := dtypesym(t.Key())
 		s2 := dtypesym(t.Val())
 		s3 := dtypesym(bmap(t))
+		fmt.Println("******** dtypesym switch", "TMap hmap")
 		s4 := dtypesym(hmap(t))
+		fmt.Println("******** dtypesym switch", "TMap after hmap")
 		ot = dcommontype(lsym, ot, t)
 		ot = dsymptr(lsym, ot, s1, 0)
 		ot = dsymptr(lsym, ot, s2, 0)
@@ -1339,6 +1351,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		ot = dextratype(lsym, ot, t, 0)
 
 	case TPTR32, TPTR64:
+		fmt.Println("****** dtypesym switch", "TPTR")
 		if t.Elem().Etype == TANY {
 			// ../../../../runtime/type.go:/UnsafePointerType
 			ot = dcommontype(lsym, ot, t)
@@ -1357,8 +1370,10 @@ func dtypesym(t *types.Type) *obj.LSym {
 	// ../../../../runtime/type.go:/structType
 	// for security, only the exported fields.
 	case TSTRUCT:
+		fmt.Println("****** dtypesym switch", "TSTRUCT")
 		fields := t.Fields().Slice()
 		for _, t1 := range fields {
+			fmt.Println("****** dtypesym switch", "TSTRUCT", fmt.Sprintf("%#v", t1))
 			dtypesym(t1.Type)
 		}
 
@@ -1519,15 +1534,19 @@ func dumpsignats() {
 	for len(signatset) > 0 {
 		signats = signats[:0]
 		// Transfer entries to a slice and sort, for reproducible builds.
+		fmt.Println("** dumpsignats before append", "signatseet", len(signatset), "signats", len(signats))
 		for t := range signatset {
 			signats = append(signats, typeAndStr{t: t, short: typesymname(t), regular: t.String()})
 			delete(signatset, t)
 		}
+		fmt.Println("** dumpsignats after append", "signatseet", len(signatset), "signats", len(signats))
 		sort.Sort(typesByString(signats))
 		for _, ts := range signats {
 			t := ts.t
+			fmt.Println("*** dtypesym", ts.short, ts.regular, ts.t)
 			dtypesym(t)
 			if t.Sym != nil {
+				fmt.Println("*** dtypesym pointer", ts.short, ts.regular, ts.t, ts.t.Sym)
 				dtypesym(types.NewPtr(t))
 			}
 		}
