@@ -1117,8 +1117,8 @@ func cmdbootstrap() {
 	flag.BoolVar(&noBanner, "no-banner", noBanner, "do not print banner")
 
 	xflagparse(0)
-
 	if debug {
+        vflag = 2
 		// cmd/buildid is used in debug mode.
 		toolchain = append(toolchain, "cmd/buildid")
 	}
