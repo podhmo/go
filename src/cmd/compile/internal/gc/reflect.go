@@ -226,16 +226,22 @@ func bmap(t *types.Type) *types.Type {
 }
 
 func hlink(t *types.Type) *types.Type {
+	if t.MapType().Hlink != nil {
+		return t.MapType().Hlink
+	}
+
 	hlink := types.New(TSTRUCT)
-	hlink.SetNoalg(true)
-	prev := types.NewPtr(hlink)
-	next := types.NewPtr(hlink)
 	fields := []*types.Field{
-		makefield("prev", prev),
-		makefield("next", next),
+		makefield("prev", types.NewPtr(hlink)),
+		makefield("next", types.NewPtr(hlink)),
 		makefield("key", types.Types[TUNSAFEPTR]),
 	}
+	hlink.SetNoalg(true)
 	hlink.SetFields(fields)
+    hlink.SetRecur(true)
+    dowidth(hlink)
+	t.MapType().Hlink = hlink
+	hlink.StructType().Map = t
 	return hlink
 }
 
@@ -1172,8 +1178,9 @@ func dtypesym(t *types.Type) *obj.LSym {
 
 	s := typesym(t)
 	lsym := s.Linksym()
-	fmt.Println("**** dtypesym", "Siggen")
+	fmt.Println("**** dtypesym", "Siggen", t)
 	if s.Siggen() {
+		fmt.Println("****** dtypesym", "Siggen if", t)
 		return lsym
 	}
 	s.SetSiggen(true)
@@ -1183,7 +1190,9 @@ func dtypesym(t *types.Type) *obj.LSym {
 	// emit the type structures for int, float, etc.
 	tbase := t
 
+	fmt.Println("****** dtypesym", "IsPtrf", t)
 	if t.IsPtr() && t.Sym == nil && t.Elem().Sym != nil {
+		fmt.Println("****** dtypesym", "IsPtrf if", t)
 		tbase = t.Elem()
 	}
 	dupok := 0
@@ -1191,13 +1200,16 @@ func dtypesym(t *types.Type) *obj.LSym {
 		dupok = obj.DUPOK
 	}
 
+	fmt.Println("****** dtypesym", "!=runtime", t)
 	if myimportpath != "runtime" || (tbase != types.Types[tbase.Etype] && tbase != types.Bytetype && tbase != types.Runetype && tbase != types.Errortype) { // int, float, etc
 		// named types from other files are defined only by those files
 		if tbase.Sym != nil && tbase.Sym.Pkg != localpkg {
+			fmt.Println("****** dtypesym", "!=runtime !sym if", t)
 			return lsym
 		}
 		// TODO(mdempsky): Investigate whether this can happen.
 		if isforw[tbase.Etype] {
+			fmt.Println("****** dtypesym", "!=runtime isforw if", t)
 			return lsym
 		}
 	}
@@ -1370,10 +1382,10 @@ func dtypesym(t *types.Type) *obj.LSym {
 	// ../../../../runtime/type.go:/structType
 	// for security, only the exported fields.
 	case TSTRUCT:
-		fmt.Println("****** dtypesym switch", "TSTRUCT")
+		fmt.Println("****** dtypesym switch", "TSTRUCT", t)
 		fields := t.Fields().Slice()
 		for _, t1 := range fields {
-			fmt.Println("****** dtypesym switch", "TSTRUCT", fmt.Sprintf("%#v", t1))
+			fmt.Println("****** dtypesym switch", "TSTRUCT", t, fmt.Sprintf("%#v", t1))
 			dtypesym(t1.Type)
 		}
 
@@ -1382,6 +1394,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 		// identifying and recording that package within the
 		// struct type descriptor, we can omit that
 		// information from the field descriptors.
+		fmt.Println("****** dtypesym switch spkg", "TSTRUCT", t)
 		var spkg *types.Pkg
 		for _, f := range fields {
 			if !exportname(f.Sym.Name) {
@@ -1390,13 +1403,18 @@ func dtypesym(t *types.Type) *obj.LSym {
 			}
 		}
 
+		fmt.Println("****** dtypesym switch dcommontype", "TSTRUCT", t)
 		ot = dcommontype(lsym, ot, t)
+		fmt.Println("****** dtypesym switch dgopkgpath", "TSTRUCT", t)
 		ot = dgopkgpath(lsym, ot, spkg)
+		fmt.Println("****** dtypesym switch dsymptr", "TSTRUCT", t)
 		ot = dsymptr(lsym, ot, lsym, ot+3*Widthptr+uncommonSize(t))
+		fmt.Println("****** dtypesym switch duintptr", "TSTRUCT", t)
 		ot = duintptr(lsym, ot, uint64(len(fields)))
 		ot = duintptr(lsym, ot, uint64(len(fields)))
 
 		dataAdd := len(fields) * structfieldSize()
+		fmt.Println("****** dtypesym switch dextratype", "TSTRUCT", t)
 		ot = dextratype(lsym, ot, t, dataAdd)
 
 		for _, f := range fields {
@@ -1412,6 +1430,7 @@ func dtypesym(t *types.Type) *obj.LSym {
 			}
 			ot = duintptr(lsym, ot, offsetAnon)
 		}
+		fmt.Println("****** dtypesym switch END", "TSTRUCT", t)
 	}
 
 	ot = dextratypeData(lsym, ot, t)
@@ -1541,12 +1560,12 @@ func dumpsignats() {
 		}
 		fmt.Println("** dumpsignats after append", "signatseet", len(signatset), "signats", len(signats))
 		sort.Sort(typesByString(signats))
-		for _, ts := range signats {
+		for i, ts := range signats {
 			t := ts.t
-			fmt.Println("*** dtypesym", ts.short, ts.regular, ts.t)
+			fmt.Println("*** dtypesym", i, ts.short, ts.regular, ts.t)
 			dtypesym(t)
 			if t.Sym != nil {
-				fmt.Println("*** dtypesym pointer", ts.short, ts.regular, ts.t, ts.t.Sym)
+				fmt.Println("*** dtypesym pointer", i, ts.short, ts.regular, ts.t, ts.t.Sym)
 				dtypesym(types.NewPtr(t))
 			}
 		}

@@ -822,6 +822,10 @@ func typefmt(t *types.Type, flag FmtFlag, mode fmtMode, depth int) string {
 				return "map.iter[" + tmodeString(m.Key(), mode, depth) + "]" + tmodeString(m.Val(), mode, depth)
 			}
 
+			if mt.Hlink == t {
+				return "map.link[" + tmodeString(m.Key(), mode, depth) + "]" + tmodeString(m.Val(), mode, depth)
+			}
+
 			Fatalf("unknown internal map type")
 		}
 
