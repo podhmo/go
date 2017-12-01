@@ -181,6 +181,7 @@ func mapaccess1_faststr(t *maptype, h *hmap, ky string) unsafe.Pointer {
 		throw("concurrent map read and map write")
 	}
 	key := stringStructOf(&ky)
+
 	if h.B == 0 {
 		// One-bucket table.
 		b := (*bmap)(h.buckets)
@@ -425,7 +426,7 @@ again:
 	} else {
 		*(*uint32)(insertk) = key
 	}
-	println("@onadd32", h.hash0, "-", key, insertk, *(*uint32)(insertk))
+	// println("@onadd32", h.hash0, "-", key, insertk, *(*uint32)(insertk))
 	hlinkadd(t, h, insertk)
 	h.count++
 
@@ -522,7 +523,7 @@ again:
 	} else {
 		*(*uint64)(insertk) = key
 	}
-	println("@onadd64", h.hash0, "-", key, insertk, *(*uint64)(insertk))
+	// println("@onadd64", h.hash0, "-", key, insertk, *(*uint64)(insertk))
 	hlinkadd(t, h, insertk)
 	h.count++
 done:
@@ -654,9 +655,8 @@ search:
 			if key != *(*uint32)(k) || b.tophash[i] == empty {
 				continue
 			}
-			println("@onremove 32", h.hash0, "-", key, *(*uint32)(k))
-
-			hlinkremove_fast32(h, key)
+			// println("@onremove 32", h.hash0, "-", key, *(*uint32)(k))
+			hlinkremove_fast32(t, h, key)
 
 			// Only clear key if there are pointers in it.
 			if t.key.kind&kindNoPointers == 0 {
@@ -707,8 +707,8 @@ search:
 			if key != *(*uint64)(k) || b.tophash[i] == empty {
 				continue
 			}
-			println("@onremove 64", h.hash0, "-", key, *(*uint64)(k))
-			hlinkremove_fast64(h, key)
+			// println("@onremove 64", h.hash0, "-", key, *(*uint64)(k))
+			hlinkremove_fast64(t, h, key)
 			// Only clear key if there are pointers in it.
 			if t.key.kind&kindNoPointers == 0 {
 				memclrHasPointers(k, t.key.size)
@@ -764,7 +764,7 @@ search:
 			if k.str != key.str && !memequal(k.str, key.str, uintptr(key.len)) {
 				continue
 			}
-			hlinkremove_faststring(h, key)
+			hlinkremove_faststring(t, h, ky)
 			// Clear key's pointer.
 			k.str = nil
 			// Only clear value if there are pointers in it.
@@ -1087,19 +1087,16 @@ func evacuate_faststr(t *maptype, h *hmap, oldbucket uintptr) {
 	}
 }
 
-func hlinkremove_fast32(h *hmap, key uint32) {
+func hlinkremove_fast32(t *maptype, h *hmap, key uint32) {
 	// unlink (O(N))
-	l := h.start
-	if l.next == nil {
-		return
-	}
-
-	for l := l.next; l != nil; l = l.next {
-		// println("@@32", h.hash0, "-", *(*uint32)(l.key), key)
+	for l := h.start; l != nil; l = l.next {
 		if *(*uint32)(l.key) == key {
-			println("@@@@32 OK", h.hash0, *(*uint32)(l.key), key)
-			if l.next == nil {
+			if h.start == l && h.end == l {
+				h.start = nil
+				h.end = nil
+			} else if l.next == nil {
 				l.prev.next = nil
+				h.end = l.prev
 			} else if l.prev == nil {
 				h.start = l.next
 			} else {
@@ -1110,23 +1107,26 @@ func hlinkremove_fast32(h *hmap, key uint32) {
 			return
 		}
 	}
-	println("@@@@32 NOTFOUND", h.hash0, key)
-	// panic("not found 32")
+	rk, rv := mapaccessK(t, h, noescape(unsafe.Pointer(&key)))
+	if rv == nil {
+		// key has been deleted
+		panic("not found 32 accessK")
+	}
+	hlinkremove(t, h, rk, true)
 }
 
-func hlinkremove_fast64(h *hmap, key uint64) {
+func hlinkremove_fast64(t *maptype, h *hmap, key uint64) {
 	// unlink (O(N))
-	l := h.start
-	if l.next == nil {
-		return
-	}
-
-	for l := l.next; l != nil; l = l.next {
-		// println("@@64", h.hash0, "-", *(*uint64)(l.key), key)
+	for l := h.start; l != nil; l = l.next {
+		// // println("@@64", h.hash0, "-", *(*uint64)(l.key), key)
 		if *(*uint64)(l.key) == key {
-			println("@@@@64 OK", h.hash0, *(*uint64)(l.key), key)
-			if l.next == nil {
+			// println("@@@@64 OK", h.hash0, *(*uint64)(l.key), key)
+			if h.start == l && h.end == l {
+				h.start = nil
+				h.end = nil
+			} else if l.next == nil {
 				l.prev.next = nil
+				h.end = l.prev
 			} else if l.prev == nil {
 				h.start = l.next
 			} else {
@@ -1137,24 +1137,29 @@ func hlinkremove_fast64(h *hmap, key uint64) {
 			return
 		}
 	}
-	println("@@@@64 NOTFOUND", h.hash0, key)
-	// panic("not found 64")
+	rk, rv := mapaccessK(t, h, noescape(unsafe.Pointer(&key)))
+	if rv == nil {
+		// key has been deleted
+		panic("not found 64 accessK")
+	}
+	hlinkremove(t, h, rk, true)
 }
 
-func hlinkremove_faststring(h *hmap, key *stringStruct) {
+func hlinkremove_faststring(t *maptype, h *hmap, ky string) {
 	// unlink (O(N))
-	l := h.start
-	if l.next == nil {
-		return
-	}
-
-	for l := l.next; l != nil; l = l.next {
+	// println("@@S start", h.hash0, "-", key.len, "-", key.str)
+	key := stringStructOf(&ky)
+	for l := h.start; l != nil; l = l.next {
 		k := (*stringStruct)(l.key)
-		// println("@@S", h.hash0, "-", k.len, key.len, "-", k.str, key.str)
+		// println("@@S", h.hash0, "-", k.len, "-", k.str)
 		if k.len == key.len && k.str == key.str {
-			println("@@@@S OK", h.hash0, k.len, key.len, "-", k.str, key.str)
-			if l.next == nil {
+			// println("@@@@S OK", h.hash0, k.len, key.len, "-", k.str, key.str)
+			if h.start == l && h.end == l {
+				h.start = nil
+				h.end = nil
+			} else if l.next == nil {
 				l.prev.next = nil
+				h.end = l.prev
 			} else if l.prev == nil {
 				h.start = l.next
 			} else {
@@ -1165,6 +1170,10 @@ func hlinkremove_faststring(h *hmap, key *stringStruct) {
 			return
 		}
 	}
-	println("@@@@S NOTFOUND", h.hash0, key.len, key.str)
-	// panic("not found string")
+	rk, rv := mapaccessK(t, h, noescape(unsafe.Pointer(&ky)))
+	if rv == nil {
+		// key has been deleted
+		panic("not found string accessK")
+	}
+	hlinkremove(t, h, rk, true)
 }

@@ -132,28 +132,30 @@ type hlink struct {
 
 func hlinkadd(t *maptype, h *hmap, k unsafe.Pointer) {
 	if h.start == nil {
-		root := &hlink{}
-		h.start = root
-		h.end = root
+		l := &hlink{key: k}
+		h.start = l
+		h.end = l
+	} else {
+		l := &hlink{key: k, prev: h.end}
+		h.end.next = l
+		h.end = l
 	}
-	l := &hlink{key: k, prev: h.end}
-	h.end.next = l
-	h.end = l
+
 }
 
-func hlinkremove(t *maptype, h *hmap, key unsafe.Pointer) {
+func hlinkremove(t *maptype, h *hmap, key unsafe.Pointer, retry bool) {
 	// unlink (O(N))
-	l := h.start
-	if l.next == nil {
-		return
-	}
-
 	alg := t.key.alg
-	for l := l.next; l != nil; l = l.next {
+again:
+	for l := h.start; l != nil; l = l.next {
 		if alg.equal(key, l.key) {
-			println("@@@@ OK", h.hash0)
-			if l.next == nil {
+			// println("@@@@ OK", h.hash0)
+			if h.start == l && h.end == l {
+				h.start = nil
+				h.end = nil
+			} else if l.next == nil {
 				l.prev.next = nil
+				h.end = l.prev
 			} else if l.prev == nil {
 				h.start = l.next
 			} else {
@@ -164,7 +166,16 @@ func hlinkremove(t *maptype, h *hmap, key unsafe.Pointer) {
 			return
 		}
 	}
-	// panic("not found")
+	rk, rv := mapaccessK(t, h, key)
+	if rv == nil {
+		// key has been deleted
+		panic("not found accessK")
+	}
+	if retry {
+		println("@@ END", h.hash0, h.count, rk, rv)
+		panic("not found")
+	}
+	goto again
 }
 
 // mapextra holds fields that are not present on all maps.
@@ -345,7 +356,7 @@ func makemap(t *maptype, hint int, h *hmap) *hmap {
 	// The size of hmap should be 48 bytes on 64 bit
 	// and 28 bytes on 32 bit platforms.
 	if sz := unsafe.Sizeof(hmap{}); sz != 8+7*sys.PtrSize {
-		println("runtime: sizeof(hmap) =", sz, ", t.hmap.size =", t.hmap.size)
+		// println("runtime: sizeof(hmap) =", sz, ", t.hmap.size =", t.hmap.size)
 		throw("bad hmap size")
 	}
 
@@ -704,7 +715,7 @@ search:
 			if !alg.equal(key, k2) {
 				continue
 			}
-			hlinkremove(t, h, key)
+			hlinkremove(t, h, k2, false)
 			// Only clear key if there are pointers in it.
 			if t.indirectkey {
 				*(*unsafe.Pointer)(k) = nil
