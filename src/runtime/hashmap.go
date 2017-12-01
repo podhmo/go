@@ -130,7 +130,7 @@ type hlink struct {
 	key  unsafe.Pointer
 }
 
-func hlinkAdd(h *hmap, k unsafe.Pointer) {
+func hlinkadd(t *maptype, h *hmap, k unsafe.Pointer) {
 	if h.start == nil {
 		root := &hlink{}
 		h.start = root
@@ -140,10 +140,18 @@ func hlinkAdd(h *hmap, k unsafe.Pointer) {
 	h.end.next = l
 	h.end = l
 }
-func hlinkRemove(h *hmap, k unsafe.Pointer) {
+
+func hlinkremove(t *maptype, h *hmap, key unsafe.Pointer) {
 	// unlink (O(N))
-	for l := h.start; l != nil; l = l.next {
-		if l.key == k {
+	l := h.start
+	if l.next == nil {
+		return
+	}
+
+	alg := t.key.alg
+	for l := l.next; l != nil; l = l.next {
+		if alg.equal(key, l.key) {
+			println("@@@@ OK", h.hash0)
 			if l.next == nil {
 				l.prev.next = nil
 			} else if l.prev == nil {
@@ -638,6 +646,7 @@ again:
 	}
 	typedmemmove(t.key, insertk, key)
 	*inserti = top
+	hlinkadd(t, h, insertk)
 	h.count++
 
 done:
@@ -695,6 +704,7 @@ search:
 			if !alg.equal(key, k2) {
 				continue
 			}
+			hlinkremove(t, h, key)
 			// Only clear key if there are pointers in it.
 			if t.indirectkey {
 				*(*unsafe.Pointer)(k) = nil

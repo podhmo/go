@@ -425,7 +425,8 @@ again:
 	} else {
 		*(*uint32)(insertk) = key
 	}
-
+	println("@onadd32", h.hash0, "-", key, insertk, *(*uint32)(insertk))
+	hlinkadd(t, h, insertk)
 	h.count++
 
 done:
@@ -521,9 +522,9 @@ again:
 	} else {
 		*(*uint64)(insertk) = key
 	}
-
+	println("@onadd64", h.hash0, "-", key, insertk, *(*uint64)(insertk))
+	hlinkadd(t, h, insertk)
 	h.count++
-	hlinkAdd(h, insertk)
 done:
 	val := add(unsafe.Pointer(insertb), dataOffset+bucketCnt*8+inserti*uintptr(t.valuesize))
 	if h.flags&hashWriting == 0 {
@@ -613,6 +614,7 @@ again:
 	insertk = add(unsafe.Pointer(insertb), dataOffset+inserti*2*sys.PtrSize)
 	// store new key at insert position
 	*((*stringStruct)(insertk)) = *key
+	hlinkadd(t, h, insertk)
 	h.count++
 
 done:
@@ -652,6 +654,10 @@ search:
 			if key != *(*uint32)(k) || b.tophash[i] == empty {
 				continue
 			}
+			println("@onremove 32", h.hash0, "-", key, *(*uint32)(k))
+
+			hlinkremove_fast32(h, key)
+
 			// Only clear key if there are pointers in it.
 			if t.key.kind&kindNoPointers == 0 {
 				memclrHasPointers(k, t.key.size)
@@ -701,6 +707,8 @@ search:
 			if key != *(*uint64)(k) || b.tophash[i] == empty {
 				continue
 			}
+			println("@onremove 64", h.hash0, "-", key, *(*uint64)(k))
+			hlinkremove_fast64(h, key)
 			// Only clear key if there are pointers in it.
 			if t.key.kind&kindNoPointers == 0 {
 				memclrHasPointers(k, t.key.size)
@@ -710,7 +718,6 @@ search:
 				v := add(unsafe.Pointer(b), dataOffset+bucketCnt*8+i*uintptr(t.valuesize))
 				memclrHasPointers(v, t.elem.size)
 			}
-			hlinkRemove(h, noescape(unsafe.Pointer(&key)))
 			b.tophash[i] = empty
 			h.count--
 			break search
@@ -757,6 +764,7 @@ search:
 			if k.str != key.str && !memequal(k.str, key.str, uintptr(key.len)) {
 				continue
 			}
+			hlinkremove_faststring(h, key)
 			// Clear key's pointer.
 			k.str = nil
 			// Only clear value if there are pointers in it.
@@ -1077,4 +1085,86 @@ func evacuate_faststr(t *maptype, h *hmap, oldbucket uintptr) {
 	if oldbucket == h.nevacuate {
 		advanceEvacuationMark(h, t, newbit)
 	}
+}
+
+func hlinkremove_fast32(h *hmap, key uint32) {
+	// unlink (O(N))
+	l := h.start
+	if l.next == nil {
+		return
+	}
+
+	for l := l.next; l != nil; l = l.next {
+		// println("@@32", h.hash0, "-", *(*uint32)(l.key), key)
+		if *(*uint32)(l.key) == key {
+			println("@@@@32 OK", h.hash0, *(*uint32)(l.key), key)
+			if l.next == nil {
+				l.prev.next = nil
+			} else if l.prev == nil {
+				h.start = l.next
+			} else {
+				prev := l.prev
+				l.prev.next = l.next
+				l.next.prev = prev
+			}
+			return
+		}
+	}
+	println("@@@@32 NOTFOUND", h.hash0, key)
+	// panic("not found 32")
+}
+
+func hlinkremove_fast64(h *hmap, key uint64) {
+	// unlink (O(N))
+	l := h.start
+	if l.next == nil {
+		return
+	}
+
+	for l := l.next; l != nil; l = l.next {
+		// println("@@64", h.hash0, "-", *(*uint64)(l.key), key)
+		if *(*uint64)(l.key) == key {
+			println("@@@@64 OK", h.hash0, *(*uint64)(l.key), key)
+			if l.next == nil {
+				l.prev.next = nil
+			} else if l.prev == nil {
+				h.start = l.next
+			} else {
+				prev := l.prev
+				l.prev.next = l.next
+				l.next.prev = prev
+			}
+			return
+		}
+	}
+	println("@@@@64 NOTFOUND", h.hash0, key)
+	// panic("not found 64")
+}
+
+func hlinkremove_faststring(h *hmap, key *stringStruct) {
+	// unlink (O(N))
+	l := h.start
+	if l.next == nil {
+		return
+	}
+
+	for l := l.next; l != nil; l = l.next {
+		k := (*stringStruct)(l.key)
+		// println("@@S", h.hash0, "-", k.len, key.len, "-", k.str, key.str)
+		if k.len == key.len && k.str == key.str {
+			println("@@@@S OK", h.hash0, k.len, key.len, "-", k.str, key.str)
+			if l.next == nil {
+				l.prev.next = nil
+			} else if l.prev == nil {
+				h.start = l.next
+			} else {
+				prev := l.prev
+				l.prev.next = l.next
+				l.next.prev = prev
+			}
+			return
+		}
+	}
+	println("@@@@S NOTFOUND", h.hash0, key.len, key.str)
+	// panic("not found string")
 }
