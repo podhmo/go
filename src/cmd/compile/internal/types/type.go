@@ -191,6 +191,7 @@ type Map struct {
 	Bucket *Type // internal struct type representing a hash bucket
 	Hmap   *Type // internal struct type representing the Hmap (map header object)
 	Hiter  *Type // internal struct type representing hash iterator state
+	Hlink  *Type // internal struct type representing keys order
 }
 
 // MapType returns t's extra map-specific fields.
@@ -1077,7 +1078,9 @@ func (t *Type) cmp(x *Type) Cmp {
 			return t.StructType().Map.cmp(x.StructType().Map)
 		} else if x.StructType().Map.MapType().Bucket == x {
 			return CMPgt // bucket maps are least
-		} // If t != t.Map.Bucket, fall through to general case
+		} else if x.StructType().Map.MapType().Hlink == x {
+            return CMPgt // hlink are least (xxx)
+        }// If t != t.Map.Bucket, fall through to general case
 
 		tfs := t.FieldSlice()
 		xfs := x.FieldSlice()

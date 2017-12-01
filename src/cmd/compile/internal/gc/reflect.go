@@ -225,6 +225,26 @@ func bmap(t *types.Type) *types.Type {
 	return bucket
 }
 
+func hlink(t *types.Type) *types.Type {
+	if t.MapType().Hlink != nil {
+		return t.MapType().Hlink
+	}
+
+	hlink := types.New(TSTRUCT)
+	fields := []*types.Field{
+		makefield("prev", types.NewPtr(hlink)),
+		makefield("next", types.NewPtr(hlink)),
+		makefield("key", types.Types[TUNSAFEPTR]),
+	}
+	hlink.SetNoalg(true)
+	hlink.SetFields(fields)
+    hlink.SetRecur(true)
+    dowidth(hlink)
+	t.MapType().Hlink = hlink
+	hlink.StructType().Map = t
+	return hlink
+}
+
 // hmap builds a type representing a Hmap structure for the given map type.
 // Make sure this stays in sync with ../../../../runtime/hashmap.go.
 func hmap(t *types.Type) *types.Type {
@@ -233,7 +253,7 @@ func hmap(t *types.Type) *types.Type {
 	}
 
 	bmap := bmap(t)
-
+	hlink := hlink(t)
 	// build a struct:
 	// type hmap struct {
 	//    count      int
@@ -245,6 +265,8 @@ func hmap(t *types.Type) *types.Type {
 	//    oldbuckets *bmap
 	//    nevacuate  uintptr
 	//    extra      unsafe.Pointer // *mapextra
+	//    start      *hlink
+	//    end        *hlink
 	// }
 	// must match ../../../../runtime/hashmap.go:hmap.
 	fields := []*types.Field{
@@ -257,6 +279,8 @@ func hmap(t *types.Type) *types.Type {
 		makefield("oldbuckets", types.NewPtr(bmap)),
 		makefield("nevacuate", types.Types[TUINTPTR]),
 		makefield("extra", types.Types[TUNSAFEPTR]),
+		makefield("start", types.NewPtr(hlink)),
+		makefield("end", types.NewPtr(hlink)),
 	}
 
 	hmap := types.New(TSTRUCT)
@@ -266,7 +290,7 @@ func hmap(t *types.Type) *types.Type {
 
 	// The size of hmap should be 48 bytes on 64 bit
 	// and 28 bytes on 32 bit platforms.
-	if size := int64(8 + 5*Widthptr); hmap.Width != size {
+	if size := int64(8 + 7*Widthptr); hmap.Width != size {
 		Fatalf("hmap size not correct: got %d, want %d", hmap.Width, size)
 	}
 

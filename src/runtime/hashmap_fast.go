@@ -523,7 +523,7 @@ again:
 	}
 
 	h.count++
-
+	hlinkAdd(h, insertk)
 done:
 	val := add(unsafe.Pointer(insertb), dataOffset+bucketCnt*8+inserti*uintptr(t.valuesize))
 	if h.flags&hashWriting == 0 {
@@ -710,6 +710,7 @@ search:
 				v := add(unsafe.Pointer(b), dataOffset+bucketCnt*8+i*uintptr(t.valuesize))
 				memclrHasPointers(v, t.elem.size)
 			}
+			hlinkRemove(h, noescape(unsafe.Pointer(&key)))
 			b.tophash[i] = empty
 			h.count--
 			break search

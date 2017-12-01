@@ -119,6 +119,44 @@ type hmap struct {
 	nevacuate  uintptr        // progress counter for evacuation (buckets less than this have been evacuated)
 
 	extra *mapextra // optional fields
+	start *hlink
+	end   *hlink
+}
+
+// hlink has ordered info
+type hlink struct {
+	prev *hlink
+	next *hlink
+	key  unsafe.Pointer
+}
+
+func hlinkAdd(h *hmap, k unsafe.Pointer) {
+	if h.start == nil {
+		root := &hlink{}
+		h.start = root
+		h.end = root
+	}
+	l := &hlink{key: k, prev: h.end}
+	h.end.next = l
+	h.end = l
+}
+func hlinkRemove(h *hmap, k unsafe.Pointer) {
+	// unlink (O(N))
+	for l := h.start; l != nil; l = l.next {
+		if l.key == k {
+			if l.next == nil {
+				l.prev.next = nil
+			} else if l.prev == nil {
+				h.start = l.next
+			} else {
+				prev := l.prev
+				l.prev.next = l.next
+				l.next.prev = prev
+			}
+			return
+		}
+	}
+	// panic("not found")
 }
 
 // mapextra holds fields that are not present on all maps.
@@ -298,7 +336,7 @@ func makemap_small() *hmap {
 func makemap(t *maptype, hint int, h *hmap) *hmap {
 	// The size of hmap should be 48 bytes on 64 bit
 	// and 28 bytes on 32 bit platforms.
-	if sz := unsafe.Sizeof(hmap{}); sz != 8+5*sys.PtrSize {
+	if sz := unsafe.Sizeof(hmap{}); sz != 8+7*sys.PtrSize {
 		println("runtime: sizeof(hmap) =", sz, ", t.hmap.size =", t.hmap.size)
 		throw("bad hmap size")
 	}

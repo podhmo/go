@@ -37,6 +37,7 @@ func (t *Timings) append(labels []string, start bool) {
 // Start marks the beginning of a new phase and implicitly stops the previous phase.
 // The phase name is the colon-separated concatenation of the labels.
 func (t *Timings) Start(labels ...string) {
+	fmt.Println(labels)
 	t.append(labels, true)
 }
 
