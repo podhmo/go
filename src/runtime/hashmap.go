@@ -140,16 +140,15 @@ func hlinkadd(t *maptype, h *hmap, k unsafe.Pointer) {
 		h.end.next = l
 		h.end = l
 	}
-
 }
 
 func hlinkremove(t *maptype, h *hmap, key unsafe.Pointer, retry bool) {
 	// unlink (O(N))
+	life := 2
 	alg := t.key.alg
 again:
 	for l := h.start; l != nil; l = l.next {
-		if alg.equal(key, l.key) {
-			// println("@@@@ OK", h.hash0)
+		if t.reflexivekey || alg.equal(key, l.key) {
 			if h.start == l && h.end == l {
 				h.start = nil
 				h.end = nil
@@ -163,6 +162,7 @@ again:
 				l.prev.next = l.next
 				l.next.prev = prev
 			}
+            println("@@@@ OK", h.hash0, "indirect", t.indirectkey, t.indirectvalue, "count", h.count, "retry", retry, "key", t.keysize, t.valuesize, t.reflexivekey, t.needkeyupdate)
 			return
 		}
 	}
@@ -171,10 +171,15 @@ again:
 		// key has been deleted
 		panic("not found accessK")
 	}
-	if retry {
-		println("@@ END", h.hash0, h.count, rk, rv)
+	life--
+	if life < 0 || retry {
+		println("@@@@ END", h.hash0, "indirect", t.indirectkey, t.indirectvalue, "count", h.count, "retry", retry, "key", t.keysize, t.valuesize, t.reflexivekey, t.needkeyupdate)
+		for l := h.start; l != nil; l = l.next {
+			println("@@@@@", h.hash0, rk, l.key)
+		}
 		panic("not found")
 	}
+	key = rk
 	goto again
 }
 
@@ -356,7 +361,7 @@ func makemap(t *maptype, hint int, h *hmap) *hmap {
 	// The size of hmap should be 48 bytes on 64 bit
 	// and 28 bytes on 32 bit platforms.
 	if sz := unsafe.Sizeof(hmap{}); sz != 8+7*sys.PtrSize {
-		// println("runtime: sizeof(hmap) =", sz, ", t.hmap.size =", t.hmap.size)
+		println("runtime: sizeof(hmap) =", sz, ", t.hmap.size =", t.hmap.size)
 		throw("bad hmap size")
 	}
 
